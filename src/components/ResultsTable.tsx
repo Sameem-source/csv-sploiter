@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useCsvStore } from "@/lib/csv-store";
 import { Badge } from "@/components/ui/badge";
 import { getIndexColor } from "@/components/FieldPanel";
+import { SecurityEventCard } from "@/components/SecurityEventCard";
 import {
   Table,
   TableBody,
@@ -35,8 +36,12 @@ export function ResultsTable() {
     currentPage * pageSize
   );
 
-  const uniqueIndexes = new Set(results.map((r) => r.index));
+  const isSecurityEventsOnly = useMemo(
+    () => results.length > 0 && results.every((r) => r.index === "SecurityEvents"),
+    [results]
+  );
 
+  const uniqueIndexes = new Set(results.map((r) => r.index));
   if (Object.keys(indexes).length === 0) return null;
 
   return (
@@ -74,57 +79,65 @@ export function ResultsTable() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Content */}
       <ScrollArea className="flex-1">
-        <div className="min-w-max">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="sticky left-0 bg-card z-10 w-32">
-                  Index
-                </TableHead>
-                {columns.map((col) => (
-                  <TableHead key={col} className="whitespace-nowrap">
-                    {col}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paged.length === 0 ? (
+        {isSecurityEventsOnly ? (
+          <div className="p-2 space-y-2">
+            {paged.map((result, i) => (
+              <SecurityEventCard key={i} row={result.row} indexName={result.index} />
+            ))}
+          </div>
+        ) : (
+          <div className="min-w-max">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell
-                    colSpan={columns.length + 1}
-                    className="text-center text-muted-foreground py-8"
-                  >
-                    No results found
-                  </TableCell>
+                  <TableHead className="sticky left-0 bg-card z-10 w-32">
+                    Index
+                  </TableHead>
+                  {columns.map((col) => (
+                    <TableHead key={col} className="whitespace-nowrap">
+                      {col}
+                    </TableHead>
+                  ))}
                 </TableRow>
-              ) : (
-                paged.map((result, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="sticky left-0 bg-card z-10">
-                      <Badge
-                        variant="outline"
-                        className={`text-[10px] ${getIndexColor(result.index)}`}
-                      >
-                        {result.index}
-                      </Badge>
+              </TableHeader>
+              <TableBody>
+                {paged.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={columns.length + 1}
+                      className="text-center text-muted-foreground py-8"
+                    >
+                      No results found
                     </TableCell>
-                    {columns.map((col) => (
-                      <TableCell
-                        key={col}
-                        className="font-mono text-xs whitespace-nowrap max-w-[300px] truncate"
-                      >
-                        {result.row[col] ?? ""}
-                      </TableCell>
-                    ))}
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                ) : (
+                  paged.map((result, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="sticky left-0 bg-card z-10">
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] ${getIndexColor(result.index)}`}
+                        >
+                          {result.index}
+                        </Badge>
+                      </TableCell>
+                      {columns.map((col) => (
+                        <TableCell
+                          key={col}
+                          className="font-mono text-xs whitespace-nowrap max-w-[300px] truncate"
+                        >
+                          {result.row[col] ?? ""}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
         <ScrollBar orientation="horizontal" />
       </ScrollArea>
     </div>
