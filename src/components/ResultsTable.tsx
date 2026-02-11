@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useCsvStore } from "@/lib/csv-store";
 import { Badge } from "@/components/ui/badge";
 import { getIndexColor } from "@/components/FieldPanel";
-import { SecurityEventCard } from "@/components/SecurityEventCard";
+import { SecurityEventCard, HIGH_VALUE_EVENTS } from "@/components/SecurityEventCard";
 import {
   Table,
   TableBody,
@@ -30,15 +30,26 @@ export function ResultsTable() {
     return Array.from(colSet);
   }, [results]);
 
-  const totalPages = Math.max(1, Math.ceil(results.length / pageSize));
-  const paged = results.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
-
   const isSecurityEventsOnly = useMemo(
     () => results.length > 0 && results.every((r) => r.index === "SecurityEvents"),
     [results]
+  );
+
+  const filteredResults = useMemo(() => {
+    if (!isSecurityEventsOnly) return results;
+    return results.filter((r) => {
+      const eid = Object.keys(r.row).find((k) => k.toLowerCase().includes("eventid") || k.toLowerCase() === "id");
+      const val = eid ? r.row[eid]?.trim() : "";
+      return val ? HIGH_VALUE_EVENTS[val] !== undefined : true;
+    });
+  }, [results, isSecurityEventsOnly]);
+
+  const hiddenCount = isSecurityEventsOnly ? results.length - filteredResults.length : 0;
+  const displayResults = isSecurityEventsOnly ? filteredResults : results;
+  const totalPages = Math.max(1, Math.ceil(displayResults.length / pageSize));
+  const paged = displayResults.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
   );
 
   const uniqueIndexes = new Set(results.map((r) => r.index));
@@ -49,10 +60,15 @@ export function ResultsTable() {
       {/* Stats bar */}
       <div className="flex items-center justify-between px-1 py-2 text-xs text-muted-foreground border-b">
         <span>
-          <strong className="text-foreground">{results.length.toLocaleString()}</strong>{" "}
-          results from{" "}
+          <strong className="text-foreground">{displayResults.length.toLocaleString()}</strong>{" "}
+          {isSecurityEventsOnly ? "high-value events" : "results"} from{" "}
           <strong className="text-foreground">{uniqueIndexes.size}</strong>{" "}
           {uniqueIndexes.size === 1 ? "index" : "indexes"}
+          {hiddenCount > 0 && (
+            <span className="text-muted-foreground ml-1">
+              ({hiddenCount} low-value events hidden)
+            </span>
+          )}
         </span>
         <div className="flex items-center gap-2">
           <Button

@@ -1,189 +1,176 @@
 import { Badge } from "@/components/ui/badge";
 import { getIndexColor } from "@/components/FieldPanel";
-import { Shield, Clock, User, Monitor, Hash, FileText } from "lucide-react";
+import { AlertTriangle, Info, ShieldAlert } from "lucide-react";
 
-// Well-known Windows Security Event IDs
-const EVENT_ID_MAP: Record<string, { label: string; severity: "info" | "warn" | "critical" }> = {
-  "4624": { label: "Successful Logon", severity: "info" },
-  "4625": { label: "Failed Logon", severity: "warn" },
-  "4634": { label: "Logoff", severity: "info" },
-  "4648": { label: "Logon with Explicit Credentials", severity: "warn" },
-  "4672": { label: "Special Privileges Assigned", severity: "warn" },
-  "4688": { label: "New Process Created", severity: "info" },
-  "4689": { label: "Process Exited", severity: "info" },
-  "4697": { label: "Service Installed", severity: "warn" },
-  "4698": { label: "Scheduled Task Created", severity: "warn" },
-  "4699": { label: "Scheduled Task Deleted", severity: "info" },
-  "4700": { label: "Scheduled Task Enabled", severity: "info" },
-  "4701": { label: "Scheduled Task Disabled", severity: "info" },
-  "4702": { label: "Scheduled Task Updated", severity: "info" },
-  "4719": { label: "Audit Policy Changed", severity: "critical" },
-  "4720": { label: "User Account Created", severity: "warn" },
-  "4722": { label: "User Account Enabled", severity: "info" },
-  "4723": { label: "Password Change Attempt", severity: "info" },
-  "4724": { label: "Password Reset Attempt", severity: "warn" },
-  "4725": { label: "User Account Disabled", severity: "info" },
-  "4726": { label: "User Account Deleted", severity: "warn" },
-  "4728": { label: "Member Added to Security Group", severity: "warn" },
-  "4732": { label: "Member Added to Local Group", severity: "warn" },
-  "4735": { label: "Local Group Changed", severity: "warn" },
-  "4738": { label: "User Account Changed", severity: "info" },
-  "4740": { label: "Account Locked Out", severity: "critical" },
-  "4756": { label: "Member Added to Universal Group", severity: "warn" },
-  "4767": { label: "Account Unlocked", severity: "info" },
-  "4768": { label: "Kerberos TGT Requested", severity: "info" },
-  "4769": { label: "Kerberos Service Ticket Requested", severity: "info" },
-  "4770": { label: "Kerberos Service Ticket Renewed", severity: "info" },
-  "4771": { label: "Kerberos Pre-Auth Failed", severity: "warn" },
-  "4776": { label: "NTLM Authentication", severity: "info" },
-  "4798": { label: "User Local Group Membership Enumerated", severity: "info" },
-  "4799": { label: "Security Group Membership Enumerated", severity: "info" },
-  "5140": { label: "Network Share Accessed", severity: "info" },
-  "5145": { label: "Network Share Object Checked", severity: "info" },
-  "7045": { label: "New Service Installed", severity: "warn" },
-  "1102": { label: "Audit Log Cleared", severity: "critical" },
+/**
+ * High-value forensic Windows Security Event IDs.
+ * Only these are shown when viewing SecurityEvents index.
+ */
+export const HIGH_VALUE_EVENTS: Record<
+  string,
+  { label: string; category: string; severity: "info" | "warn" | "critical" }
+> = {
+  // Authentication
+  "4624": { label: "Successful Logon", category: "Authentication", severity: "info" },
+  "4625": { label: "Failed Logon", category: "Authentication", severity: "warn" },
+  "4648": { label: "Logon Using Explicit Credentials", category: "Authentication", severity: "warn" },
+  "4771": { label: "Kerberos Pre-Auth Failed", category: "Authentication", severity: "warn" },
+  "4776": { label: "NTLM Credential Validation", category: "Authentication", severity: "info" },
+
+  // Privilege Escalation
+  "4672": { label: "Special Privileges Assigned to Logon", category: "Privilege Escalation", severity: "warn" },
+
+  // Account Management
+  "4720": { label: "User Account Created", category: "Account Management", severity: "warn" },
+  "4724": { label: "Password Reset Attempt", category: "Account Management", severity: "warn" },
+  "4726": { label: "User Account Deleted", category: "Account Management", severity: "warn" },
+  "4728": { label: "Member Added to Security-Enabled Global Group", category: "Account Management", severity: "warn" },
+  "4732": { label: "Member Added to Security-Enabled Local Group", category: "Account Management", severity: "warn" },
+  "4740": { label: "Account Locked Out", category: "Account Management", severity: "critical" },
+  "4756": { label: "Member Added to Universal Security Group", category: "Account Management", severity: "warn" },
+
+  // Persistence & Execution
+  "4688": { label: "New Process Created", category: "Execution", severity: "info" },
+  "4697": { label: "Service Installed on System", category: "Persistence", severity: "warn" },
+  "7045": { label: "New Service Installed", category: "Persistence", severity: "warn" },
+  "4698": { label: "Scheduled Task Created", category: "Persistence", severity: "warn" },
+
+  // Lateral Movement
+  "4768": { label: "Kerberos TGT Requested", category: "Lateral Movement", severity: "info" },
+  "4769": { label: "Kerberos Service Ticket Requested", category: "Lateral Movement", severity: "info" },
+  "5140": { label: "Network Share Object Accessed", category: "Lateral Movement", severity: "info" },
+  "5145": { label: "Network Share Object Checked", category: "Lateral Movement", severity: "info" },
+
+  // Defense Evasion
+  "1102": { label: "Audit Log Was Cleared", category: "Defense Evasion", severity: "critical" },
+  "4719": { label: "System Audit Policy Changed", category: "Defense Evasion", severity: "critical" },
 };
 
-const SEVERITY_STYLES = {
-  info: "bg-blue-500/10 text-blue-700 border-blue-200",
-  warn: "bg-amber-500/10 text-amber-700 border-amber-200",
-  critical: "bg-red-500/10 text-red-700 border-red-200",
+const SEVERITY_ICON = {
+  info: <Info className="h-4 w-4 text-blue-500" />,
+  warn: <AlertTriangle className="h-4 w-4 text-amber-500" />,
+  critical: <ShieldAlert className="h-4 w-4 text-red-500" />,
 };
 
-// Try to find a column value case-insensitively
-function findField(row: Record<string, string>, ...candidates: string[]): string {
-  for (const c of candidates) {
-    const key = Object.keys(row).find((k) => k.toLowerCase() === c.toLowerCase());
-    if (key && row[key]?.trim()) return row[key];
+const SEVERITY_BORDER = {
+  info: "border-l-blue-400",
+  warn: "border-l-amber-400",
+  critical: "border-l-red-500",
+};
+
+const CATEGORY_COLOR: Record<string, string> = {
+  Authentication: "bg-blue-100 text-blue-800",
+  "Privilege Escalation": "bg-purple-100 text-purple-800",
+  "Account Management": "bg-amber-100 text-amber-800",
+  Execution: "bg-cyan-100 text-cyan-800",
+  Persistence: "bg-orange-100 text-orange-800",
+  "Lateral Movement": "bg-indigo-100 text-indigo-800",
+  "Defense Evasion": "bg-red-100 text-red-800",
+};
+
+// Case-insensitive field lookup
+function f(row: Record<string, string>, ...keys: string[]): string {
+  for (const k of keys) {
+    const found = Object.keys(row).find((rk) => rk.toLowerCase() === k.toLowerCase());
+    if (found && row[found]?.trim()) return row[found].trim();
   }
   return "";
 }
 
-interface SecurityEventCardProps {
+interface Props {
   row: Record<string, string>;
   indexName: string;
 }
 
-export function SecurityEventCard({ row, indexName }: SecurityEventCardProps) {
-  const eventId = findField(row, "EventId", "EventID", "Event ID", "Id", "ID");
-  const timeCreated = findField(row, "TimeCreated", "Time", "Timestamp", "Date", "DateTime", "EventTime");
-  const account = findField(row, "TargetUserName", "AccountName", "Account", "UserName", "User", "SubjectUserName");
-  const computer = findField(row, "Computer", "ComputerName", "MachineName", "Workstation", "Host");
-  const logonType = findField(row, "LogonType", "Logon Type");
-  const sourceIp = findField(row, "IpAddress", "SourceAddress", "SourceIP", "Source IP", "ClientAddress");
-  const processName = findField(row, "ProcessName", "NewProcessName", "Process", "Image");
-  const message = findField(row, "Message", "Description", "Details", "EventMessage");
+export function SecurityEventCard({ row, indexName }: Props) {
+  const eventId = f(row, "EventId", "EventID", "Event ID", "Id", "ID");
+  const meta = eventId ? HIGH_VALUE_EVENTS[eventId] : undefined;
+  const severity = meta?.severity ?? "info";
 
-  const eventInfo = eventId ? EVENT_ID_MAP[eventId] : undefined;
-  const severityStyle = eventInfo ? SEVERITY_STYLES[eventInfo.severity] : SEVERITY_STYLES.info;
+  // Key forensic fields
+  const fields: { label: string; value: string }[] = [
+    { label: "Event ID", value: eventId },
+    { label: "Description", value: meta?.label ?? "Unknown Event" },
+    { label: "Time", value: f(row, "TimeCreated", "Time", "Timestamp", "Date", "DateTime", "EventTime") },
+    { label: "Computer", value: f(row, "Computer", "ComputerName", "MachineName", "Host") },
+    { label: "Subject Account", value: f(row, "SubjectUserName", "SubjectAccount") },
+    { label: "Subject Domain", value: f(row, "SubjectDomainName", "SubjectDomain") },
+    { label: "Target Account", value: f(row, "TargetUserName", "AccountName", "Account", "UserName", "User") },
+    { label: "Target Domain", value: f(row, "TargetDomainName", "TargetDomain") },
+    { label: "Logon Type", value: f(row, "LogonType", "Logon Type") },
+    { label: "Logon ID", value: f(row, "SubjectLogonId", "TargetLogonId", "LogonId") },
+    { label: "Source IP", value: f(row, "IpAddress", "SourceAddress", "SourceIP", "ClientAddress") },
+    { label: "Source Port", value: f(row, "IpPort", "SourcePort") },
+    { label: "Workstation", value: f(row, "WorkstationName", "Workstation") },
+    { label: "Process", value: f(row, "ProcessName", "NewProcessName", "Process", "Image") },
+    { label: "Process ID", value: f(row, "ProcessId", "NewProcessId") },
+    { label: "Parent Process", value: f(row, "ParentProcessName", "ParentImage") },
+    { label: "Service Name", value: f(row, "ServiceName", "Service") },
+    { label: "Task Name", value: f(row, "TaskName") },
+    { label: "Status", value: f(row, "Status") },
+    { label: "Failure Reason", value: f(row, "FailureReason", "SubStatus") },
+    { label: "Logon Process", value: f(row, "LogonProcessName", "LogonProcess") },
+    { label: "Auth Package", value: f(row, "AuthenticationPackageName", "AuthPackage") },
+    { label: "Share Name", value: f(row, "ShareName") },
+    { label: "Share Path", value: f(row, "ShareLocalPath", "RelativeTargetName") },
+  ].filter((x) => x.value !== "");
 
-  // Collect remaining fields not already highlighted
-  const highlightedKeys = new Set<string>();
-  const markUsed = (...candidates: string[]) => {
-    for (const c of candidates) {
-      const key = Object.keys(row).find((k) => k.toLowerCase() === c.toLowerCase());
-      if (key) highlightedKeys.add(key);
-    }
-  };
-  markUsed("EventId", "EventID", "Event ID", "Id", "ID");
-  markUsed("TimeCreated", "Time", "Timestamp", "Date", "DateTime", "EventTime");
-  markUsed("TargetUserName", "AccountName", "Account", "UserName", "User", "SubjectUserName");
-  markUsed("Computer", "ComputerName", "MachineName", "Workstation", "Host");
-  markUsed("LogonType", "Logon Type");
-  markUsed("IpAddress", "SourceAddress", "SourceIP", "Source IP", "ClientAddress");
-  markUsed("ProcessName", "NewProcessName", "Process", "Image");
-  markUsed("Message", "Description", "Details", "EventMessage");
-
-  const extraFields = Object.entries(row).filter(
-    ([k, v]) => !highlightedKeys.has(k) && v?.trim()
+  // Any remaining fields not already shown
+  const usedKeys = new Set<string>();
+  fields.forEach(({ value }) => {
+    Object.entries(row).forEach(([k, v]) => {
+      if (v?.trim() === value) usedKeys.add(k);
+    });
+  });
+  const extras = Object.entries(row).filter(
+    ([k, v]) => !usedKeys.has(k) && v?.trim()
   );
 
   return (
-    <div className="border rounded-lg p-3 bg-card hover:bg-accent/30 transition-colors">
-      {/* Header row */}
-      <div className="flex items-center gap-2 flex-wrap mb-2">
-        <Badge variant="outline" className={`text-[10px] ${getIndexColor(indexName)}`}>
-          {indexName}
-        </Badge>
-        {eventId && (
-          <Badge variant="outline" className={`text-xs font-mono ${severityStyle}`}>
-            <Hash className="h-3 w-3 mr-1" />
-            {eventId}
+    <div
+      className={`border rounded-md border-l-4 ${SEVERITY_BORDER[severity]} bg-card p-3 hover:bg-accent/20 transition-colors`}
+    >
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-2 flex-wrap">
+        {SEVERITY_ICON[severity]}
+        <span className="font-mono text-sm font-bold text-foreground">
+          {eventId || "?"}
+        </span>
+        <span className="text-sm font-semibold text-foreground">
+          {meta?.label ?? "Unknown Event"}
+        </span>
+        {meta?.category && (
+          <Badge className={`text-[10px] border-0 ${CATEGORY_COLOR[meta.category] ?? "bg-secondary text-secondary-foreground"}`}>
+            {meta.category}
           </Badge>
         )}
-        {eventInfo && (
-          <span className="text-sm font-semibold text-foreground">
-            {eventInfo.label}
-          </span>
-        )}
-        {!eventInfo && eventId && (
-          <span className="text-sm text-muted-foreground">Event {eventId}</span>
-        )}
-        {timeCreated && (
-          <span className="text-[11px] text-muted-foreground ml-auto flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            {timeCreated}
-          </span>
-        )}
+        <Badge variant="outline" className={`text-[10px] ml-auto ${getIndexColor(indexName)}`}>
+          {indexName}
+        </Badge>
       </div>
 
-      {/* Key fields grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1 text-xs">
-        {account && (
-          <div className="flex items-center gap-1">
-            <User className="h-3 w-3 text-muted-foreground shrink-0" />
-            <span className="text-muted-foreground">Account:</span>
-            <span className="font-mono font-medium truncate">{account}</span>
+      {/* Fields grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1">
+        {fields.map(({ label, value }) => (
+          <div key={label} className="flex gap-1.5 text-xs leading-5">
+            <span className="text-muted-foreground whitespace-nowrap shrink-0">{label}:</span>
+            <span className="font-mono font-medium text-foreground truncate" title={value}>
+              {value}
+            </span>
           </div>
-        )}
-        {computer && (
-          <div className="flex items-center gap-1">
-            <Monitor className="h-3 w-3 text-muted-foreground shrink-0" />
-            <span className="text-muted-foreground">Computer:</span>
-            <span className="font-mono font-medium truncate">{computer}</span>
-          </div>
-        )}
-        {logonType && (
-          <div className="flex items-center gap-1">
-            <Shield className="h-3 w-3 text-muted-foreground shrink-0" />
-            <span className="text-muted-foreground">Logon Type:</span>
-            <span className="font-mono font-medium">{logonType}</span>
-          </div>
-        )}
-        {sourceIp && (
-          <div className="flex items-center gap-1">
-            <span className="text-muted-foreground">Source IP:</span>
-            <span className="font-mono font-medium">{sourceIp}</span>
-          </div>
-        )}
-        {processName && (
-          <div className="flex items-center gap-1 col-span-2">
-            <FileText className="h-3 w-3 text-muted-foreground shrink-0" />
-            <span className="text-muted-foreground">Process:</span>
-            <span className="font-mono font-medium truncate">{processName}</span>
-          </div>
-        )}
+        ))}
       </div>
 
-      {/* Message if present */}
-      {message && (
-        <p className="text-[11px] text-muted-foreground mt-2 font-mono leading-relaxed line-clamp-2">
-          {message}
-        </p>
-      )}
-
-      {/* Extra fields collapsed into a compact row */}
-      {extraFields.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
-          {extraFields.slice(0, 8).map(([k, v]) => (
+      {/* Extra fields */}
+      {extras.length > 0 && (
+        <div className="mt-2 pt-2 border-t border-dashed flex flex-wrap gap-x-4 gap-y-0.5 text-[10px] text-muted-foreground">
+          {extras.slice(0, 6).map(([k, v]) => (
             <span key={k}>
               <span className="font-medium">{k}:</span>{" "}
-              <span className="font-mono">{v.length > 60 ? v.slice(0, 60) + "…" : v}</span>
+              <span className="font-mono">{v.length > 50 ? v.slice(0, 50) + "…" : v}</span>
             </span>
           ))}
-          {extraFields.length > 8 && (
-            <span className="italic">+{extraFields.length - 8} more</span>
-          )}
+          {extras.length > 6 && <span className="italic">+{extras.length - 6} more</span>}
         </div>
       )}
     </div>
